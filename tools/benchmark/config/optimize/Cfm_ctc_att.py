@@ -5,23 +5,24 @@ import tqdm
 from espnet2.bin.asr_inference import Speech2Text as espnet_model
 from espnet_onnx.utils.config import Config
 
-tag_name = 'Shinji Watanabe/librispeech_asr_train_asr_transformer_e18_raw_bpe_sp_valid.acc.best'
+tag_name = 'pyf98/librispeech_conformer_hop_length160'
 device = 'cpu'
 wav_dir = '/home/ubuntu/LibriSpeech/test-clean'
-output_dir = './tools/benchmark/result/full/trf_ctc_att'
+output_dir = './tools/benchmark/result/optimize/cfm_ctc_att'
 
 export = Config({
     'apply_quantize': False,
-    'apply_optimize': False,
+    'apply_optimize': True,
     'config': {
         'max_seq_len': 5000,
+        'use_ort_for_espnet': True,
     },
 })
 
 espnet = Config({
     'model_config': {},
     'remove_modules': ['lm'],
-    'require_inference': True
+    'require_inference': False
 })
 
 onnx = Config({

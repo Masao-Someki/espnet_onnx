@@ -47,6 +47,7 @@ def write_result(output_dir, file_name, l):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('config_module', type=str, help='Directory to the wav file.')
+    parser.add_argument('output_dir', type=str)
     args = parser.parse_args()
 
     # load config file
@@ -68,6 +69,8 @@ if __name__ == '__main__':
             device=config.device,
             **config.espnet.model_config
         )
+        maybe_remove_modules(espnet_model, config.espnet.remove_modules)
+
 
     # load onnx model
     PROVIDER = 'CUDAExecutionProvider' if config.device == 'cuda' else 'CPUExecutionProvider'
@@ -78,7 +81,6 @@ if __name__ == '__main__':
     )
 
     # remove lm/decoder if required
-    maybe_remove_modules(espnet_model, config.espnet.remove_modules)
     maybe_remove_modules(onnx_model, config.onnx.remove_modules)
 
     # load wav files and write output
@@ -105,6 +107,7 @@ if __name__ == '__main__':
         if config.require_format:
             res_e = config.format_hypo(res_e, wav_id)
             res_o = config.format_hypo(res_o, wav_id)
+            ref_text = config.format_hypo(ref_text, wav_id)
 
         if is_first_iter:
             is_first_iter = False
@@ -119,8 +122,8 @@ if __name__ == '__main__':
         refs.append(ref_text)
     
     # write result into file
-    write_result(config.output_dir, 'espnet_rtf', rtfs_e)
-    write_result(config.output_dir, 'espnet_hypo', results_e)
-    write_result(config.output_dir, 'onnx_rtf', rtfs_o)
-    write_result(config.output_dir, 'onnx_hypo', results_o)
-    write_result(config.output_dir, 'ref', results_o)
+    write_result(args.output_dir, 'espnet_rtf', rtfs_e)
+    write_result(args.output_dir, 'espnet_hypo', results_e)
+    write_result(args.output_dir, 'onnx_rtf', rtfs_o)
+    write_result(args.output_dir, 'onnx_hypo', results_o)
+    write_result(args.output_dir, 'ref', results_o)
