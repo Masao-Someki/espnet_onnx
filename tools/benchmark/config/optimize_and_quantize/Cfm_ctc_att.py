@@ -27,7 +27,7 @@ espnet = Config({
 
 onnx = Config({
     'model_config': {
-        'use_quantized': False
+        'use_quantized': True
     },
     'remove_modules': ['lm']
 })

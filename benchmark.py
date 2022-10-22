@@ -7,6 +7,7 @@ import time
 
 import librosa
 
+from espnet_onnx.asr.beam_search.beam_search_transducer import BeamSearchTransducer
 from espnet_onnx import Speech2Text
 from espnet_onnx.export import ASRModelExport
 from importlib import import_module
@@ -17,6 +18,15 @@ logger = logging.getLogger(__name__)
 def maybe_remove_modules(model, module_list):
     removed = False
     for m in module_list:
+        if model.beam_search is None:
+            model.beam_search_transducer.lm = None
+            model.beam_search_transducer.use_lm = False
+            continue
+        elif isinstance(model.beam_search, BeamSearchTransducer):
+            model.beam_search.lm = None
+            model.beam_search.lm = None
+            continue
+
         if m in model.beam_search.scorers.keys():
             removed = True
             del model.beam_search.scorers[m]
@@ -59,7 +69,8 @@ if __name__ == '__main__':
     m.export_from_pretrained(
         config.tag_name,
         quantize=config.export.apply_quantize,
-        optimize=config.export.apply_optimize
+        optimize=config.export.apply_optimize,
+        pretrained_config=config.espnet.model_config.dic
     )
 
     # load espnet model
@@ -93,6 +104,7 @@ if __name__ == '__main__':
     results_e = []
     results_o = []
     refs = []
+
     for ref_text, wav_file, sr, wav_id in config.wav_loader():
         y, sr = librosa.load(wav_file, sr=sr)
 
@@ -126,4 +138,4 @@ if __name__ == '__main__':
     write_result(args.output_dir, 'espnet_hypo', results_e)
     write_result(args.output_dir, 'onnx_rtf', rtfs_o)
     write_result(args.output_dir, 'onnx_hypo', results_o)
-    write_result(args.output_dir, 'ref', results_o)
+    write_result(args.output_dir, 'ref', refs)
