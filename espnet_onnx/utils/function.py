@@ -1,5 +1,9 @@
 import numpy as np
 import six
+# from sklearn.neighbors._base import KNeighborsMixin
+from mlprodict.onnxrt.ops_cpu._op_onnx_numpy import topk_element_max_float
+
+# mixin = KNeighborsMixin() # for topk
 
 def subsequent_mask(size):
     """Create mask for subsequent steps (size, size).
@@ -150,7 +154,8 @@ def topk(x: np.ndarray, k: int, require_value: bool = False):
                [3,0],
                [2,3]])
     """
-    topk_index = np.argpartition(x, x.shape[-1] - k, axis=-1)[..., -k:]
+    topk_index = topk_element_max_float(x, k, False, 8)
+    # topk_index = np.argpartition(x, x.shape[-1] - k, axis=-1)[..., -k:]
     if require_value:
         return np.take_along_axis(x, topk_index, axis=-1), topk_index
     else:
