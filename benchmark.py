@@ -75,16 +75,6 @@ if __name__ == '__main__':
     # load config file
     config = import_module(args.config_module)
 
-    # export onnx model
-    m = ASRModelExport()
-    m.set_export_config(**config.export.config)
-    # m.export_from_pretrained(
-    #    config.tag_name,
-    #    quantize=config.export.apply_quantize,
-    #    optimize=config.export.apply_optimize,
-    #    pretrained_config=config.espnet.model_config.dic
-    # )
-
     # load espnet model
     if config.espnet.require_inference:
         try:
@@ -104,10 +94,20 @@ if __name__ == '__main__':
         maybe_remove_modules(espnet_model, config.espnet.remove_modules)
         # maybe_quantize_module(espnet_model)
     
+    # export onnx model
+    m = ASRModelExport()
+    m.set_export_config(**config.export.config)
+    m.export_from_pretrained(
+       config.tag_name,
+       quantize=config.export.apply_quantize,
+       optimize=config.export.apply_optimize,
+       pretrained_config=config.espnet.model_config.dic
+    )
+
     # load onnx model
     PROVIDER = 'CUDAExecutionProvider' if config.device == 'cuda' else 'CPUExecutionProvider'
     onnx_model = Speech2Text(
-        config.tag_name,
+        config.tag_name.replace('.zip', ''),
         providers=[PROVIDER],
         **config.onnx.model_config
     )
@@ -138,9 +138,7 @@ if __name__ == '__main__':
             rtf_e = None
             res_e = None
             
-        #rtf_o, res_o = measure_time(onnx_model, y, sr)
-        rtf_o = None
-        res_o = None
+        rtf_o, res_o = measure_time(onnx_model, y, sr)
 
         if config.require_format:
             res_e = config.format_hypo(res_e, wav_id)
