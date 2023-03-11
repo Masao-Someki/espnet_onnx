@@ -5,13 +5,14 @@ from mlprodict.onnxrt.ops_cpu._op_onnx_numpy import topk_element_max_float
 
 # mixin = KNeighborsMixin() # for topk
 
+
 def subsequent_mask(size):
     """Create mask for subsequent steps (size, size).
     Modified from the original mask function to apply for fix-length mask.
-    
+
     Args:
         size(int) : size of mask
-    
+
     Examples:
         >>> subsequent_mask(3)
         [[1, 0, 0],
@@ -38,7 +39,7 @@ def mask_fill(arr, mask, mask_value):
 
 def make_pad_mask(lengths, xs=None, dim=-1, xs_shape=None):
     """Make mask tensor containing indices of padded part.
-    
+
     Args:
         lengths (np.ndarray or List): Batch of lengths (B,).
         xs (np.ndarray, optional): The reference tensor.
@@ -56,7 +57,7 @@ def make_pad_mask(lengths, xs=None, dim=-1, xs_shape=None):
         masks = [[0, 0, 0, 0 ,0],
                  [0, 0, 0, 1, 1],
                  [0, 0, 1, 1, 1]]
-                 
+
         With the reference tensor.
         >>> xs = np.zeros((3, 2, 4))
         >>> make_pad_mask(lengths, xs)
@@ -66,7 +67,7 @@ def make_pad_mask(lengths, xs=None, dim=-1, xs_shape=None):
                  [0, 0, 0, 1]],
                 [[0, 0, 1, 1],
                  [0, 0, 1, 1]]])
-                 
+
         >>> xs = np.zeros((3, 2, 6))
         >>> make_pad_mask(lengths, xs)
         array([[[0, 0, 0, 0, 0, 1],
@@ -75,7 +76,7 @@ def make_pad_mask(lengths, xs=None, dim=-1, xs_shape=None):
                  [0, 0, 0, 1, 1, 1]],
                 [[0, 0, 1, 1, 1, 1],
                  [0, 0, 1, 1, 1, 1]]])
-                 
+
         With the reference tensor and dimension indicator.
         >>> xs = np.zeros((3, 6, 6))
         >>> make_pad_mask(lengths, xs, 1)
@@ -97,7 +98,7 @@ def make_pad_mask(lengths, xs=None, dim=-1, xs_shape=None):
                  [1, 1, 1, 1, 1, 1],
                  [1, 1, 1, 1, 1, 1],
                  [1, 1, 1, 1, 1, 1]]])
-                 
+
         >>> make_pad_mask(lengths, xs, 2)
         array([[[0, 0, 0, 0, 0, 1],
                  [0, 0, 0, 0, 0, 1],
@@ -127,7 +128,7 @@ def make_pad_mask(lengths, xs=None, dim=-1, xs_shape=None):
         base = base.transpose(0, 2, 1)
 
     for i in range(len(base)):
-        base[i][..., lengths[i]:] = 1
+        base[i][..., lengths[i] :] = 1
 
     if len(base.shape) == 3 and dim == 1:
         base = base.transpose(0, 2, 1)
@@ -137,11 +138,11 @@ def make_pad_mask(lengths, xs=None, dim=-1, xs_shape=None):
 
 def topk(x: np.ndarray, k: int, require_value: bool = False):
     """Get indicies of topk.
-    
+
     Args:
         x (np.ndarray)
         k (int)
-        
+
     Examples:
         >>> a = np.array([3,6,1,7])
         >>> topk(a, 2)
@@ -179,7 +180,7 @@ def pad_sequence(yseqs, batch_first=False, padding_value=0):
         >>> c = np.ones(15, 300)
         >>> pad_sequence([a, b, c]).size()
         (25, 3, 300)
-        
+
         >>> pad_sequence([a, b, c], batch_first=True).size()
         (3, 25, 300)
     """
@@ -190,7 +191,7 @@ def pad_sequence(yseqs, batch_first=False, padding_value=0):
     max_shape = yseqs[max_idx].shape
     base = np.ones((len(yseqs), *max_shape)) * padding_value
     for i, y in enumerate(yseqs):
-        base[i][:y.shape[0]] = y
+        base[i][: y.shape[0]] = y
     if batch_first:
         return base
     else:
@@ -199,11 +200,11 @@ def pad_sequence(yseqs, batch_first=False, padding_value=0):
 
 def is_prefix(x, pref) -> bool:
     """Check if pref is a prefix of x.
-    
+
     Args:
         x: Label ID sequence.
         pref: Prefix label ID sequence.
-        
+
     Returns:
         : Whether pref is a prefix of x.
     """
@@ -219,10 +220,10 @@ def is_prefix(x, pref) -> bool:
 
 def recombine_hyps(hyps):
     """Recombine hypotheses with same label ID sequence.
-    
+
     Args:
         hyps: Hypotheses.
-        
+
     Returns:
        final: Recombined hypotheses.
     """
@@ -234,9 +235,8 @@ def recombine_hyps(hyps):
         if hyp.yseq in seq_final:
             seq_pos = seq_final.index(hyp.yseq)
 
-            final[seq_pos].score = np.logaddexp(
-                final[seq_pos].score, hyp.score)
-            
+            final[seq_pos].score = np.logaddexp(final[seq_pos].score, hyp.score)
+
         else:
             final.append(hyp)
 
@@ -253,22 +253,21 @@ def select_k_expansions(
     """Return K hypotheses candidates for expansion from a list of hypothesis.
     K candidates are selected according to the extended hypotheses probabilities
     and a prune-by-value method. Where K is equal to beam_size + beta.
-    
+
     Args:
         hyps: Hypotheses.
         beam_logp: Log-probabilities for hypotheses expansions.
         beam_size: Beam size.
         gamma: Allowed logp difference for prune-by-value method.
         beta: Number of additional candidates to store.
-        
+
     Return:
         k_expansions: Best K expansion hypotheses candidates.
     """
     k_expansions = []
 
     for i, hyp in enumerate(hyps):
-        hyp_i = [(int(k), hyp.score + float(logp))
-                 for k, logp in enumerate(logps[i])]
+        hyp_i = [(int(k), hyp.score + float(logp)) for k, logp in enumerate(logps[i])]
         k_best_exp = max(hyp_i, key=lambda x: x[1])[1]
 
         k_expansions.append(
@@ -284,11 +283,11 @@ def select_k_expansions(
 
 def subtract(x, subset):
     """Remove elements of subset if corresponding label ID sequence already exist in x.
-    
+
     Args:
         x: Set of hypotheses.
         subset: Subset of x.
-        
+
     Returns:
        final: New set of hypotheses.
     """
@@ -301,6 +300,7 @@ def subtract(x, subset):
 
     return final
 
+
 def narrow(arr: np.ndarray, axis: int, start: int, length: int):
     """Numpy implementation of torch.narrow
 
@@ -310,7 +310,8 @@ def narrow(arr: np.ndarray, axis: int, start: int, length: int):
         start (int): the starting dimension
         length (int): the distance to the ending dimension
     """
-    return arr.take(np.arange(start, start+length), axis=axis)
+    return arr.take(np.arange(start, start + length), axis=axis)
+
 
 def end_detect(ended_hyps, i, M=3, D_end=np.log(1 * np.exp(-10))):
     """End detection.

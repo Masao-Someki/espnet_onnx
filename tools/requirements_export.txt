@@ -1,4 +1,4 @@
-numpy==1.21
+numpy
 onnxruntime
 librosa
 sentencepiece
@@ -14,3 +14,5 @@ coloredlogs
 sympy
 protobuf==3.20.1
 transformers
+black
+isort
