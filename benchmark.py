@@ -98,11 +98,21 @@ if __name__ == '__main__':
     m = ASRModelExport()
     m.set_export_config(**config.export.config)
     m.export_from_pretrained(
-       config.tag_name,
-       quantize=config.export.apply_quantize,
-       optimize=config.export.apply_optimize,
-       pretrained_config=config.espnet.model_config.dic
+        config.tag_name,
+        quantize=config.export.apply_quantize,
+        optimize=config.export.apply_optimize,
+        pretrained_config=config.espnet.model_config.dic
     )
+
+    # load espnet model
+    if config.espnet.require_inference:
+        espnet_model = config.espnet_model.from_pretrained(
+            config.tag_name,
+            device=config.device,
+            **config.espnet.model_config
+        )
+        maybe_remove_modules(espnet_model, config.espnet.remove_modules)
+
 
     # load onnx model
     PROVIDER = 'CUDAExecutionProvider' if config.device == 'cuda' else 'CPUExecutionProvider'

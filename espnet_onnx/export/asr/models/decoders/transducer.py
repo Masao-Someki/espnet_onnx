@@ -15,7 +15,7 @@ class TransducerDecoder(nn.Module, AbsExportModel):
         self.dlayers = model.dlayers
         self.dunits = model.dunits
         self.dtype = model.dtype
-        self.model_name = "transducer_encoder"
+        self.model_name = 'transducer_decoder'
 
     def forward(self, labels, h_cache, c_cache):
         # embed and rnn-forward

@@ -5,13 +5,13 @@ import tqdm
 from espnet2.bin.asr_inference import Speech2Text as espnet_model
 from espnet_onnx.utils.config import Config
 
-tag_name = 'Shinji Watanabe/librispeech_asr_train_asr_transformer_e18_raw_bpe_sp_valid.acc.best'
+tag_name = "espnet/simpleoier_librispeech_asr_train_asr_conformer7_hubert_ll60k_large_raw_en_bpe5000_sp"
 device = 'cpu'
 wav_dir = '/home/ubuntu/LibriSpeech/test-clean'
-output_dir = './tools/benchmark/result/full/trf_ctc_att'
+output_dir = './tools/benchmark/result/quantize/cfm_hubert'
 
 export = Config({
-    'apply_quantize': False,
+    'apply_quantize': True,
     'apply_optimize': False,
     'config': {
         'max_seq_len': 5000,
@@ -21,12 +21,12 @@ export = Config({
 espnet = Config({
     'model_config': {},
     'remove_modules': ['lm'],
-    'require_inference': True
+    'require_inference': False
 })
 
 onnx = Config({
     'model_config': {
-        'use_quantized': False
+        'use_quantized': True
     },
     'remove_modules': ['lm']
 })
@@ -47,7 +47,7 @@ def get_transcription(reader, chapter):
 def wav_loader():
     readers = glob.glob(os.path.join(wav_dir, '*'))[:5]
     for reader in readers:
-        for chapter in glob.glob(os.path.join(wav_dir, reader, '*')):
+        for chapter in glob.glob(os.path.join(wav_dir, reader, '*'))[:5]:
             # read transcription
             texts = get_transcription(reader, chapter)
             for d in tqdm.tqdm(texts):
@@ -59,4 +59,4 @@ def wav_loader():
 
 require_format = True
 def format_hypo(text, utt_id):
-    return f'({utt_id}) ({text})'
+    return f'({text}) ({utt_id})'
