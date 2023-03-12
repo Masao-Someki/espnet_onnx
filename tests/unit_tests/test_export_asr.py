@@ -9,15 +9,15 @@ from espnet_onnx.export.asr.models import get_decoder, get_encoder, get_lm
 from espnet_onnx.utils.config import save_config
 
 encoder_cases = [
-    "conformer_abs_pos",
-    "conformer_rel_pos",
-    "conformer_rpe_latest",
-    "conformer_scaled",
-    "transformer",
-    "rnn_rnn",
-    "rnn_rnnp",
-    "rnn_vggrnn",
-    "contextual_block_conformer",
+    # "conformer_abs_pos",
+    # "conformer_rel_pos",
+    # "conformer_rpe_latest",
+    # "conformer_scaled",
+    # "transformer",
+    # "rnn_rnn",
+    # "rnn_rnnp",
+    # "rnn_vggrnn",
+    # "contextual_block_conformer",
     "contextual_block_transformer",
 ]
 

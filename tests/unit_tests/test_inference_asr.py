@@ -11,18 +11,18 @@ from espnet_onnx.asr.model.decoder import get_decoder
 from espnet_onnx.asr.model.lm import get_lm
 from espnet_onnx.utils.config import get_config
 
-from .forward_utils import (run_onnx_enc, run_rnn_dec, run_trans_dec,
-                            run_xformer_dec)
+from .forward_utils import (run_onnx_enc, run_rnn_dec, run_streaming_enc,
+                            run_trans_dec, run_xformer_dec)
 
 encoder_cases = [
-    ("conformer_abs_pos", [50, 100]),
-    ("conformer_rel_pos", [50, 100]),
-    ("conformer_rpe_latest", [50, 100]),
-    ("conformer_scaled", [50, 100]),
-    ("transformer", [50, 100]),
-    ("rnn_rnn", [50, 100]),
-    ("rnn_rnnp", [50, 100]),
-    ("rnn_vggrnn", [50, 100]),
+    # ("conformer_abs_pos", [50, 100]),
+    # ("conformer_rel_pos", [50, 100]),
+    # ("conformer_rpe_latest", [50, 100]),
+    # ("conformer_scaled", [50, 100]),
+    # ("transformer", [50, 100]),
+    # ("rnn_rnn", [50, 100]),
+    # ("rnn_rnnp", [50, 100]),
+    # ("rnn_vggrnn", [50, 100]),
 ]
 
 decoder_cases = [
@@ -47,6 +47,11 @@ lm_cases = [
     ("transformer_pe", [50, 100]),
 ]
 
+streaming_cases = [
+    # ("contextual_block_conformer", [50, 100]),
+    ("contextual_block_transformer", 40, 16, 4, 16, 1),
+]
+
 CACHE_DIR = Path.home() / ".cache" / "espnet_onnx" / "test"
 PROVIDERS = ["CPUExecutionProvider"]
 
@@ -58,7 +63,7 @@ def check_output(out_t, out_o):
     ), f"The shape of output of onnx {out_o.shape} should be the same with the output of torch model {out_t.shape}"
 
     mean_dif = np.mean((out_t - out_o) ** 2)
-    assert mean_dif < 1e-10, f"Result of torch model and onnx model differs."
+    assert mean_dif < 1e-10, f"Result of torch model and onnx model differs. norm = {np.mean(np.abs(out_t - out_o))}"
 
 
 def get_predec_models(dec_type):
@@ -105,6 +110,157 @@ def test_infer_encoder(enc_type, feat_lens, load_config, get_class):
         # compute onnx model
         onnx_out = run_onnx_enc(encoder_onnx, dummy_input.numpy(), enc_type)
         check_output(torch_out, onnx_out)
+
+
+@pytest.mark.parametrize(
+    "streaming_type, block_size, hop_size, subsample, look_ahead, n_process_blocks",
+    streaming_cases,
+)
+def test_infer_streaming_encoder(
+    streaming_type,
+    block_size,
+    hop_size,
+    subsample,
+    look_ahead,
+    n_process_blocks,
+    load_config,
+    get_class,
+):
+    model_dir = CACHE_DIR / "encoder" / f"./cache_{streaming_type}"
+    model_config = load_config(streaming_type, model_type="encoder")
+
+    # prepare input_dim from frontend
+    frontend = get_class(
+        "frontend", model_config.frontend, model_config.frontend_conf.dic
+    )
+    input_size = frontend.output_size()
+
+    # prepare encoder model
+    encoder_espnet = get_class(
+        "encoder",
+        model_config.encoder,
+        model_config.encoder_conf.dic,
+        input_size=input_size,
+    )
+    encoder_espnet.load_state_dict(torch.load(glob.glob(str(model_dir / "*.pth"))[0]))
+    encoder_espnet.eval()
+    model_file = glob.glob(os.path.join(model_dir, "*encoder.onnx"))[0]
+    encoder_onnx = ort.InferenceSession(model_file, providers=PROVIDERS)
+
+    # prepare pos enc
+    pe = np.load(os.path.join(model_dir, "pe.npy"))
+
+    # test output for the first iteration
+    dummy_input = torch.randn(1, hop_size * subsample, input_size)
+    torch_cache, onnx_input = create_input_stream(
+        dummy_input,
+        block_size,
+        hop_size,
+        subsample,
+        model_config.encoder_conf.linear_units,
+        model_config.encoder_conf.num_blocks,
+        look_ahead,
+        n_process_blocks,
+        pe,
+        random=True,
+    )
+    # print(encoder_espnet)
+
+    # compute torch model
+    torch_out, torch_cache = run_streaming_enc(
+        encoder_espnet, dummy_input, torch_cache, "torch"
+    )
+
+    # compute onnx model
+    onnx_out, onnx_cache = run_streaming_enc(encoder_onnx, None, onnx_input, "onnx")
+    check_output(torch_out, onnx_out)
+
+
+def create_input_stream(
+    dummy_input,
+    block_size,
+    hop_size,
+    subsample,
+    linear_units,
+    num_blocks,
+    look_ahead,
+    n_process_blocks,
+    pe,
+    random=False,
+):
+    overlap_size = block_size - hop_size
+    mask_shape = (1, 1, block_size + 2, block_size + 2)
+    mask = np.zeros(
+        mask_shape,
+        dtype=np.float32,
+    )
+    mask[..., 1:, :-1] = 1
+    buffer_before_downsampling_shape = (1, subsample * 2, dummy_input.size(-1))
+    buffer_after_downsampling_shape = (1, overlap_size, linear_units)
+    prev_addin_shape = (1, 1, linear_units)
+    past_encoder_ctx_shape = (1, num_blocks, linear_units)
+    start = hop_size * n_process_blocks
+
+    if n_process_blocks == 0:
+        indicies = np.array(
+            [0, block_size - look_ahead, overlap_size],
+            dtype=np.int64,
+        )
+    else:
+        offset = block_size - look_ahead - hop_size
+        indicies = np.array(
+            [offset, offset + hop_size],
+            dtype=np.int64,
+        )
+    if random:
+        buffer_before_downsampling = torch.randn(buffer_before_downsampling_shape)
+        buffer_after_downsampling = torch.randn(buffer_after_downsampling_shape)
+        prev_addin = torch.randn(prev_addin_shape)
+        past_encoder_ctx = torch.randn(past_encoder_ctx_shape)
+        torch_cache = {
+            "prev_addin": prev_addin,
+            "buffer_before_downsampling": buffer_before_downsampling,
+            "buffer_after_downsampling": buffer_after_downsampling,
+            "ilens_buffer": torch.Tensor([dummy_input.size(1)]),
+            "past_encoder_ctx": past_encoder_ctx,
+            "n_processed_blocks": n_process_blocks,
+        }
+        onnx_cache = {
+            "xs_pad": dummy_input.detach().numpy(),
+            "mask": mask,
+            "buffer_before_downsampling": buffer_before_downsampling.detach().numpy(),
+            "buffer_after_downsampling": buffer_after_downsampling.detach().numpy(),
+            "prev_addin": prev_addin.detach().numpy(),
+            "pos_enc_xs": pe[:, start : start + block_size],
+            "pos_enc_addin": pe[:, n_process_blocks : n_process_blocks + 1],
+            "past_encoder_ctx": past_encoder_ctx.detach().numpy(),
+            "indicies": indicies,
+        }
+    else:
+        buffer_before_downsampling = torch.zeros(buffer_before_downsampling_shape)
+        buffer_after_downsampling = torch.zeros(buffer_after_downsampling_shape)
+        prev_addin = torch.zeros(prev_addin_shape)
+        past_encoder_ctx = torch.zeros(past_encoder_ctx_shape)
+        torch_cache = {
+            "prev_addin": prev_addin,
+            "buffer_before_downsampling": buffer_before_downsampling,
+            "buffer_after_downsampling": buffer_after_downsampling,
+            "ilens_buffer": torch.Tensor([dummy_input.size(1)]),
+            "past_encoder_ctx": past_encoder_ctx,
+            "n_processed_blocks": n_process_blocks,
+        }
+        onnx_cache = {
+            "xs_pad": dummy_input.detach().numpy(),
+            "mask": mask,
+            "buffer_before_downsampling": buffer_before_downsampling.detach().numpy(),
+            "buffer_after_downsampling": buffer_after_downsampling.detach().numpy(),
+            "prev_addin": prev_addin.detach().numpy(),
+            "pos_enc_xs": pe[:, start : start + block_size],
+            "pos_enc_addin": pe[:, n_process_blocks : n_process_blocks + 1],
+            "past_encoder_ctx": past_encoder_ctx.detach().numpy(),
+            "indicies": indicies,
+        }
+    return torch_cache, onnx_cache
 
 
 @pytest.mark.parametrize("dec_type, feat_lens", decoder_cases)

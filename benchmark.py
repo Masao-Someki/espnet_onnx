@@ -9,7 +9,7 @@ import torch
 import librosa
 
 from espnet_onnx.asr.beam_search.beam_search_transducer import BeamSearchTransducer
-from espnet_onnx import Speech2Text
+from espnet_onnx import StreamingSpeech2Text
 from espnet_onnx.export import ASRModelExport
 from importlib import import_module
 
@@ -52,9 +52,17 @@ def maybe_remove_modules(model, module_list):
             logger.info(f'There is no {m} in the model.')
 
 
-def measure_time(model, wav, sr):
+def run_model(model, y, use_simulate=False):
+    if use_simulate:
+        result_text = model.simulate(y)[0][0]
+    else:
+        result_text = model(y)[0][0]
+    return result_text
+
+
+def measure_time(model, wav, sr, use_simulate=False):
     start_time = time.time()
-    result_text = model(y)[0][0]
+    result_text = run_model(model, wav, use_simulate)
     elapsed_time = time.time() - start_time
     wav_length = len(wav) / sr
     rtf = elapsed_time / wav_length
@@ -116,7 +124,7 @@ if __name__ == '__main__':
 
     # load onnx model
     PROVIDER = 'CUDAExecutionProvider' if config.device == 'cuda' else 'CPUExecutionProvider'
-    onnx_model = Speech2Text(
+    onnx_model = StreamingSpeech2Text(
         config.tag_name.replace('.zip', ''),
         providers=[PROVIDER],
         **config.onnx.model_config
@@ -148,7 +156,7 @@ if __name__ == '__main__':
             rtf_e = None
             res_e = None
             
-        rtf_o, res_o = measure_time(onnx_model, y, sr)
+        rtf_o, res_o = measure_time(onnx_model, y, sr, use_simulate=True)
 
         if config.require_format:
             res_e = config.format_hypo(res_e, wav_id)

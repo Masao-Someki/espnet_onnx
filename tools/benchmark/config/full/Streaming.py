@@ -59,4 +59,4 @@ def wav_loader():
 
 require_format = True
 def format_hypo(text, utt_id):
-    return f'({utt_id}) ({text})'
+    return f'({text}) ({utt_id})'.replace('\n', '')
