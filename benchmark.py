@@ -85,19 +85,38 @@ if __name__ == '__main__':
 
     # load espnet model
     if config.espnet.require_inference:
-        try:
-            espnet_model = config.espnet_model.from_pretrained(
-                config.tag_name,
-                device=config.device,
-                beam_size=10,
-                **config.espnet.model_config.dic
-            )
-        except:
-            espnet_model = config.espnet_model.from_pretrained(
-                config.tag_name,
-                device=config.device,
-                beam_size=10,
-                **config.espnet.model_config.dic
+        # try:
+        #     espnet_model = config.espnet_model.from_pretrained(
+        #         config.tag_name,
+        #         device=config.device,
+        #         beam_size=10,
+        #         **config.espnet.model_config.dic
+        #     )
+        # except:
+        #     espnet_model = config.espnet_model.from_pretrained(
+        #         config.tag_name,
+        #         device=config.device,
+        #         beam_size=10,
+        #         **config.espnet.model_config.dic
+        #     )
+        from espnet2.bin.asr_inference_streaming import Speech2TextStreaming
+        espnet_model = Speech2TextStreaming(
+                asr_train_config='/home/masao/doc/espnet_onnx/tools/venv/lib64/python3.8/site-packages/espnet_model_zoo/models--D-Keqi--espnet_asr_train_asr_streaming_transformer_raw_en_bpe500_sp_valid.acc.ave/snapshots/948310c11d224280984270ae4a3e9792b2fbffce/exp/asr_train_asr_streaming_transformer_raw_en_bpe500_sp/config.yaml',
+                asr_model_file='/home/masao/doc/espnet_onnx/tools/venv/lib64/python3.8/site-packages/espnet_model_zoo/models--D-Keqi--espnet_asr_train_asr_streaming_transformer_raw_en_bpe500_sp_valid.acc.ave/snapshots/948310c11d224280984270ae4a3e9792b2fbffce/exp/asr_train_asr_streaming_transformer_raw_en_bpe500_sp/valid.acc.ave_10best.pth',
+                lm_train_config='/home/masao/doc/espnet_onnx/tools/venv/lib64/python3.8/site-packages/espnet_model_zoo/models--D-Keqi--espnet_asr_train_asr_streaming_transformer_raw_en_bpe500_sp_valid.acc.ave/snapshots/948310c11d224280984270ae4a3e9792b2fbffce/exp/lm_train_lm_en_bpe500/config.yaml',
+                lm_file='/home/masao/doc/espnet_onnx/tools/venv/lib64/python3.8/site-packages/espnet_model_zoo/models--D-Keqi--espnet_asr_train_asr_streaming_transformer_raw_en_bpe500_sp_valid.acc.ave/snapshots/948310c11d224280984270ae4a3e9792b2fbffce/exp/lm_train_lm_en_bpe500/19epoch.pth',
+                token_type='bpe',
+                bpemodel='/home/masao/.cache/espnet_onnx/D-Keqi/espnet_asr_train_asr_streaming_transformer_raw_en_bpe500_sp_valid.acc.ave/bpe.model',
+                beam_size=20,
+                maxlenratio=0.0,
+                minlenratio=0.0,
+                ctc_weight=0.3,
+                lm_weight=1.0,
+                nbest=1,
+                disable_repetition_detection=False,
+                #decoder_text_length_limit=decoder_text_length_limit,
+                #encoded_feat_length_limit=encoded_feat_length_limit,
+                device='cuda'
             )
         maybe_remove_modules(espnet_model, config.espnet.remove_modules)
         # maybe_quantize_module(espnet_model)
@@ -113,13 +132,13 @@ if __name__ == '__main__':
     )
 
     # load espnet model
-    if config.espnet.require_inference:
-        espnet_model = config.espnet_model.from_pretrained(
-            config.tag_name,
-            device=config.device,
-            **config.espnet.model_config
-        )
-        maybe_remove_modules(espnet_model, config.espnet.remove_modules)
+    # if config.espnet.require_inference:
+    #     espnet_model = config.espnet_model.from_pretrained(
+    #         config.tag_name,
+    #         device=config.device,
+    #         **config.espnet.model_config
+    #     )
+    #     maybe_remove_modules(espnet_model, config.espnet.remove_modules)
 
 
     # load onnx model
