@@ -53,29 +53,16 @@ def run_onnx_front(model, dummy_input):
     return y
 
 
-def run_streaming_enc(model, dummy_input, cache, model_type):
+def run_streaming_enc(model, dummy_input, dic, model_type):
     if model_type == "torch":
-        y, _, cache = model(
+        y, *_ = model(
             dummy_input,
-            torch.Tensor([dummy_input.size(1)]),
-            cache,
-            infer_mode=True,
+            torch.Tensor([dummy_input.shape[1]]),
+            prev_states=dic,
             is_final=False,
+            infer_mode=True,
         )
-        return y, cache
+        return y
     else:
-        ys_pad, bbd, bad, _, _ = model.run(
-            [
-                "ys_pad",
-                "next_buffer_before_downsampling",
-                "next_buffer_after_downsampling",
-                "next_addin",
-                "next_encoder_ctx",
-            ],
-            cache,
-        )
-
-        return ys_pad, {
-            "buffer_before_downsampling": bbd,
-            "buffer_after_downsampling": bad,
-        }
+        encoder_out = model.run(["ys_pad"], dic)[0]
+        return encoder_out

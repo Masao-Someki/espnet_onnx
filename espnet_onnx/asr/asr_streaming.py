@@ -129,9 +129,11 @@ class StreamingSpeech2Text(AbsASRModel):
     def simulate(self, speech: np.ndarray, print_every_hypo: bool = True):
         # This function will simulate streaming asr with the given audio.
         self.start()
-        process_num = (len(speech) - self.initial_wav_length) // self.hop_size + 2
+        process_num = (len(speech) - self.initial_wav_length) // self.hop_size + 1
         logging.info(f"Processing audio with {process_num + 1} processes.")
-        padded_speech = self.pad(speech, length=process_num * self.hop_size + self.initial_wav_length)
+        padded_speech = self.pad(
+            speech, length=process_num * self.hop_size + self.initial_wav_length
+        )
 
         # initial iteration
         start = 0
@@ -139,13 +141,13 @@ class StreamingSpeech2Text(AbsASRModel):
         nbest = self(padded_speech[start:end])
         if print_every_hypo and nbest != []:
             logging.info(f"Result at position {0} : {nbest[0][0]}")
-        
         # second and later iterations
         for i in range(process_num):
             start = self.hop_size * i + self.initial_wav_length
             end = self.hop_size * (i + 1) + self.initial_wav_length
             nbest = self(padded_speech[start:end])
             if print_every_hypo and nbest != []:
+                # logging.info(f"Result at position {i+1} : {nbest[0][0]}")
                 print(f"Result at position {i+1} : {nbest[0][0]}")
 
         return nbest
